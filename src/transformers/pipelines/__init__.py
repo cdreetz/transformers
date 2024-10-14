@@ -45,6 +45,9 @@ from ..utils import (
     logging,
 )
 from .audio_classification import AudioClassificationPipeline
+#from .audio_question_answering import AudioQuestionAnsweringPipeline
+#from .audio_question_answering2 import AudioQuestionAnsweringPipeline2
+from .audio_question_answering3 import AudioQuestionAnsweringPipeline3
 from .automatic_speech_recognition import AutomaticSpeechRecognitionPipeline
 from .base import (
     ArgumentHandler,
@@ -160,6 +163,19 @@ SUPPORTED_TASKS = {
         "pt": (AutoModelForAudioClassification,) if is_torch_available() else (),
         "default": {"model": {"pt": ("superb/wav2vec2-base-superb-ks", "372e048")}},
         "type": "audio",
+    },
+    "audio-question-answering": {
+        "impl": AudioQuestionAnsweringPipeline3,
+        "tf": (),
+        #"pt": ("openai/whisper-base", "distilbert-base-cased-distilled-squad"),
+        "pt": (),
+        "default": {"model": {"pt": ("facebook/wav2vec2-base-960h", "22aad52")}},
+       # "default": {
+       #     "model": {
+       #         "pt": ("openai/whisper-base")
+       #     }
+       # },
+        "type": "multimodal",
     },
     "automatic-speech-recognition": {
         "impl": AutomaticSpeechRecognitionPipeline,
@@ -582,6 +598,7 @@ def pipeline(
             The task defining which pipeline will be returned. Currently accepted tasks are:
 
             - `"audio-classification"`: will return a [`AudioClassificationPipeline`].
+            - `"audio-question-answering"`: will return a [`AudioQuestionAnsweringPipeline2`].
             - `"automatic-speech-recognition"`: will return a [`AutomaticSpeechRecognitionPipeline`].
             - `"depth-estimation"`: will return a [`DepthEstimationPipeline`].
             - `"document-question-answering"`: will return a [`DocumentQuestionAnsweringPipeline`].
