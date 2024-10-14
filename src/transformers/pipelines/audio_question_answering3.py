@@ -26,8 +26,6 @@ class AudioQuestionAnsweringPipeline3(ChunkPipeline):
         #self.asr_model.config.forced_decoder_ids = None
         self.qa_model = AutoModelForQuestionAnswering.from_pretrained(qa_model)
         self.qa_tokenizer = AutoTokenizer.from_pretrained(qa_model)
-        #self.asr_model = asr_model or AutoModelForSpeechSeq2Seq.from_pretrained("openai/whisper-base")
-        #self.qa_model = qa_model or AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad")
     
 
     def _sanitize_parameters(self, **kwargs):
@@ -61,21 +59,11 @@ class AudioQuestionAnsweringPipeline3(ChunkPipeline):
         return processed
 
     def _forward(self, model_inputs, question):
-        #with torch.no_grad():
-        #    asr_logits = self.asr_model(**model_inputs).logits
-
-        #predicted_ids = torch.argmax(asr_logits, dim=-1)
-        #transcription = self.asr_processor.batch_decode(predicted_ids)[0]
-        print(f"Model inputs shape: {model_inputs.shape}")
         predicted_ids = self.asr_model.generate(model_inputs)
-        print(f"Predicted ids shape: {predicted_ids.shape}")
         transcription = self.asr_processor.batch_decode(
             predicted_ids,
             skip_special_tokens=True,
         )
-
-        print(f"Question being passed to qa_tokenizer: {question}")
-        print(f"Transcription being passed to qa_tokenizer: {transcription[0]}")
 
         inputs = self.qa_tokenizer(
             question,
@@ -108,15 +96,10 @@ class AudioQuestionAnsweringPipeline3(ChunkPipeline):
             start_index, end_index = end_index, start_index
 
         input_ids = inputs["input_ids"][0].tolist()
-
         tokens = self.qa_tokenizer.convert_ids_to_tokens(input_ids)
-
         answer_tokens = tokens[start_index: end_index + 1]
-
         answer = self.qa_tokenizer.convert_tokens_to_string(answer_tokens)
-
         answer = answer.replace("[CLS]", "").replace("[SEP]", "").strip()
-
         confidence = (start_scores[start_index] + end_scores[end_index]) / 2
 
         print(f"Debug - Start Index: {start_index}, End Index: {end_index}")
@@ -138,7 +121,6 @@ class AudioQuestionAnsweringPipeline3(ChunkPipeline):
         #        print(f"Value of {key}: {value}")
 
         transcription, qa_outputs, inputs = self._forward(input_features.input_features, question)
-        print(f"QA outputs from forward: {qa_outputs}")
         transcription, answer, confidence = self.postprocess((transcription, qa_outputs, inputs))
 
         print(f"Transcription: {transcription}")
