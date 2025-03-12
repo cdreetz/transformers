@@ -64,18 +64,6 @@ class AudioQuestionAnsweringPipeline(Pipeline):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.check_model_type(MODEL_FOR_CAUSAL_LM_MAPPING_NAMES)
-        
-        # For Phi-4-multimodal, we need to use the processor directly
-        # If tokenizer is being used as processor (common in pipeline setup), fix it
-        if self.processor is None and hasattr(self, "tokenizer") and self.tokenizer is not None:
-            self.processor = self.tokenizer
-            
-        if self.processor is None:
-            raise ValueError(
-                "AudioQuestionAnsweringPipeline requires a processor from the model. "
-                "Make sure to initialize the pipeline with a model that has a processor, or "
-                "explicitly pass a processor to the pipeline."
-            )
 
     def _sanitize_parameters(self, top_k=None, max_new_tokens=None, generate_kwargs=None, **kwargs):
         preprocess_params = {}
@@ -189,7 +177,7 @@ class AudioQuestionAnsweringPipeline(Pipeline):
         prompt = f'{user_prompt}<|audio_1|>{question}{prompt_suffix}{assistant_prompt}'
 
         # Process with the model
-        model_inputs = self.processor(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
+        model_inputs = self.tokenizer(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
         
         if self.torch_dtype:
             model_inputs = model_inputs.to(self.torch_dtype)
@@ -218,7 +206,7 @@ class AudioQuestionAnsweringPipeline(Pipeline):
         output_ids = model_outputs["output_ids"]
         
         # Decode the output tokens
-        decoded_output = self.processor.batch_decode(
+        decoded_output = self.tokenizer.batch_decode(
             output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )[0]
         
