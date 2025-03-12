@@ -90,17 +90,20 @@ class AudioQuestionAnsweringPipeline(Pipeline):
 
     def __call__(
         self,
-        question: str,
-        audio: Union[str, np.ndarray, bytes, tuple],
+        inputs=None,
+        question: str = None,
+        audio: Union[str, np.ndarray, bytes, tuple] = None,
         **kwargs
     ):
         """
         Answer a question about audio. The audio can be either a remote URL, a local path, or the audio data itself.
 
         Args:
-            question (`str`):
+            inputs (`Dict[str, Any]`, *optional*):
+                A dictionary containing both the question and audio. If provided, overrides question and audio arguments.
+            question (`str`, *optional*):
                 The question to answer about the audio.
-            audio (`str` or `np.ndarray` or `bytes` or `tuple`):
+            audio (`str` or `np.ndarray` or `bytes` or `tuple`, *optional*):
                 The audio to analyze. It can be:
                 - A string containing a http link pointing to an audio file
                 - A string containing a local path to an audio file
@@ -120,9 +123,29 @@ class AudioQuestionAnsweringPipeline(Pipeline):
             
             If top_k is set to a value greater than 1, the output will be a list of dictionaries with the above structure.
         """
-        return super().__call__(question=question, audio=audio, **kwargs)
+        # Handle inputs in various formats
+        if inputs is None and question is not None and audio is not None:
+            inputs = {"question": question, "audio": audio}
+        elif isinstance(inputs, dict) and inputs.get("question") is not None and inputs.get("audio") is not None:
+            pass  # Use inputs as is
+        elif question is not None and audio is not None:
+            inputs = {"question": question, "audio": audio}
+        else:
+            raise ValueError(
+                "You must provide either 'inputs' as a dict containing 'question' and 'audio' keys, "
+                "or provide both 'question' and 'audio' arguments directly."
+            )
+            
+        return super().__call__(inputs, **kwargs)
 
-    def preprocess(self, question, audio):
+    def preprocess(self, inputs):
+        # Extract question and audio from inputs
+        question = inputs.get("question")
+        audio = inputs.get("audio")
+        
+        if question is None or audio is None:
+            raise ValueError("Both 'question' and 'audio' must be provided in the inputs dictionary")
+            
         # Process audio input
         if isinstance(audio, str):
             if audio.startswith("http://") or audio.startswith("https://"):
@@ -154,14 +177,14 @@ class AudioQuestionAnsweringPipeline(Pipeline):
         prompt = f'{user_prompt}<|audio_1|>{question}{prompt_suffix}{assistant_prompt}'
 
         # Process with the model
-        inputs = self.processor(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
+        model_inputs = self.processor(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
         
         if self.torch_dtype:
-            inputs = inputs.to(self.torch_dtype)
+            model_inputs = model_inputs.to(self.torch_dtype)
         if self.device.type == "cuda":
-            inputs = inputs.to(self.device)
+            model_inputs = model_inputs.to(self.device)
 
-        return inputs
+        return model_inputs
 
     def _forward(self, model_inputs, **generate_kwargs):
         # User-defined `generation_config` passed to the pipeline call takes precedence
