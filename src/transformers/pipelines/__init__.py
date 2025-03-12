@@ -47,6 +47,7 @@ from ..utils import (
     logging,
 )
 from .audio_classification import AudioClassificationPipeline
+from .audio_question_answering import AudioQuestionAnsweringPipeline
 from .automatic_speech_recognition import AutomaticSpeechRecognitionPipeline
 from .base import (
     ArgumentHandler,
@@ -156,6 +157,7 @@ TASK_ALIASES = {
     "ner": "token-classification",
     "vqa": "visual-question-answering",
     "text-to-speech": "text-to-audio",
+    "aqa": "audio-question-answering",
 }
 SUPPORTED_TASKS = {
     "audio-classification": {
@@ -164,6 +166,13 @@ SUPPORTED_TASKS = {
         "pt": (AutoModelForAudioClassification,) if is_torch_available() else (),
         "default": {"model": {"pt": ("superb/wav2vec2-base-superb-ks", "372e048")}},
         "type": "audio",
+    },
+    "audio-question-answering": {
+        "impl": AudioQuestionAnsweringPipeline,
+        "tf": (),
+        "pt": (AutoModelForCausalLM,) if is_torch_available() else (),
+        "default": {"model": {"pt": ("microsoft/Phi-4-multimodal-instruct", "19a424a")}},
+        "type": "multimodal",
     },
     "automatic-speech-recognition": {
         "impl": AutomaticSpeechRecognitionPipeline,
