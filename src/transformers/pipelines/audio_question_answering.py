@@ -64,6 +64,15 @@ class AudioQuestionAnsweringPipeline(Pipeline):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.check_model_type(MODEL_FOR_CAUSAL_LM_MAPPING_NAMES)
+        
+        # Make sure we have a processor
+        if not hasattr(self, "tokenizer") or self.tokenizer is None:
+            from transformers import AutoProcessor
+            # Try to get processor from model name
+            self.tokenizer = AutoProcessor.from_pretrained(
+                self.model.config._name_or_path if hasattr(self.model, "config") else "microsoft/Phi-4-multimodal-instruct",
+                trust_remote_code=True
+            )
 
     def _sanitize_parameters(self, top_k=None, max_new_tokens=None, generate_kwargs=None, **kwargs):
         preprocess_params = {}
@@ -179,17 +188,33 @@ class AudioQuestionAnsweringPipeline(Pipeline):
         # Process with the model
         model_inputs = self.tokenizer(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
         
-        if self.torch_dtype:
-            model_inputs = model_inputs.to(self.torch_dtype)
-        if self.device.type == "cuda":
-            model_inputs = model_inputs.to(self.device)
+        # Move inputs to the appropriate device and dtype
+        if hasattr(self, "torch_dtype") and self.torch_dtype:
+            model_inputs = {k: v.to(dtype=self.torch_dtype) if hasattr(v, "to") else v for k, v in model_inputs.items()}
+            
+        # Move to the device where the model is
+        device = getattr(self.model, "device", self.device)
+        model_inputs = {k: v.to(device=device) if hasattr(v, "to") else v for k, v in model_inputs.items()}
 
         return model_inputs
 
     def _forward(self, model_inputs, **generate_kwargs):
-        # User-defined `generation_config` passed to the pipeline call takes precedence
+        # Make sure we have a generation_config
         if "generation_config" not in generate_kwargs:
-            generate_kwargs["generation_config"] = self.generation_config
+            # Try to load it from the model or use default
+            if hasattr(self.model, "generation_config") and self.model.generation_config is not None:
+                generate_kwargs["generation_config"] = self.model.generation_config
+            elif hasattr(self, "generation_config") and self.generation_config is not None:
+                generate_kwargs["generation_config"] = self.generation_config
+            else:
+                # Try to load it from the model's checkpoint
+                try:
+                    from transformers import GenerationConfig
+                    model_id = self.model.config._name_or_path if hasattr(self.model, "config") else "microsoft/Phi-4-multimodal-instruct"
+                    generate_kwargs["generation_config"] = GenerationConfig.from_pretrained(model_id)
+                except:
+                    # Continue without it if we can't load it
+                    pass
 
         # Generate the answer
         output_ids = self.model.generate(
