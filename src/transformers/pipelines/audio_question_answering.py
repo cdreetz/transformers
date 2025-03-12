@@ -25,6 +25,10 @@ from urllib.request import urlopen
 from ..utils import add_end_docstrings, is_torch_available, logging
 from .base import Pipeline, build_pipeline_init_args
 
+# Make sure torch is available
+if is_torch_available():
+    import torch
+
 
 logger = logging.get_logger(__name__)
 
@@ -185,59 +189,57 @@ class AudioQuestionAnsweringPipeline(Pipeline):
         prompt_suffix = '<|end|>'
         prompt = f'{user_prompt}<|audio_1|>{question}{prompt_suffix}{assistant_prompt}'
 
-        # Process with the model
+        # Process with the model - EXACTLY as in the official example
         model_inputs = self.tokenizer(text=prompt, audios=[(audio_data, sampling_rate)], return_tensors='pt')
         
-        # Move inputs to the appropriate device and dtype
-        if hasattr(self, "torch_dtype") and self.torch_dtype:
-            model_inputs = {k: v.to(dtype=self.torch_dtype) if hasattr(v, "to") else v for k, v in model_inputs.items()}
-            
-        # Move to the device where the model is
-        device = getattr(self.model, "device", self.device)
-        model_inputs = {k: v.to(device=device) if hasattr(v, "to") else v for k, v in model_inputs.items()}
+        # For Phi-4-multimodal, we need to follow the exact device placement pattern
+        # from the original example
+        device_string = "cuda:0" if torch.cuda.is_available() else self.device
+        model_inputs = model_inputs.to(device_string)
 
         return model_inputs
 
     def _forward(self, model_inputs, **generate_kwargs):
-        # Make sure we have a generation_config
-        if "generation_config" not in generate_kwargs:
-            # Try to load it from the model or use default
+        # Get or set generation config
+        generation_config = None
+        max_new_tokens = generate_kwargs.pop("max_new_tokens", 1000)
+        
+        # Try to load generation_config from the model
+        try:
+            from transformers import GenerationConfig
+            
             if hasattr(self.model, "generation_config") and self.model.generation_config is not None:
-                generate_kwargs["generation_config"] = self.model.generation_config
-            elif hasattr(self, "generation_config") and self.generation_config is not None:
-                generate_kwargs["generation_config"] = self.generation_config
+                generation_config = self.model.generation_config
             else:
-                # Try to load it from the model's checkpoint
-                try:
-                    from transformers import GenerationConfig
-                    model_id = self.model.config._name_or_path if hasattr(self.model, "config") else "microsoft/Phi-4-multimodal-instruct"
-                    generate_kwargs["generation_config"] = GenerationConfig.from_pretrained(model_id)
-                except:
-                    # Continue without it if we can't load it
-                    pass
-
-        # Generate the answer
-        output_ids = self.model.generate(
+                model_id = getattr(self.model.config, "_name_or_path", "microsoft/Phi-4-multimodal-instruct")
+                generation_config = GenerationConfig.from_pretrained(model_id)
+        except Exception as e:
+            pass  # Continue without it
+        
+        # Generate response exactly as in the original example
+        generate_ids = self.model.generate(
             **model_inputs,
-            **generate_kwargs,
+            max_new_tokens=max_new_tokens,
+            generation_config=generation_config,
+            **generate_kwargs
         )
         
-        # The output_ids contain the full sequence including the prompt, so we extract only the generated part
-        output_ids = output_ids[:, model_inputs["input_ids"].shape[1]:]
+        # Extract only the generated part (exactly as in example)
+        generate_ids = generate_ids[:, model_inputs["input_ids"].shape[1]:]
         
-        return {"output_ids": output_ids}
+        return {"output_ids": generate_ids}
 
     def postprocess(self, model_outputs, top_k=1):
         output_ids = model_outputs["output_ids"]
         
-        # Decode the output tokens
-        decoded_output = self.tokenizer.batch_decode(
+        # Decode the output tokens (exactly as in the example)
+        response = self.tokenizer.batch_decode(
             output_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )[0]
         
         if top_k == 1:
-            return {"answer": decoded_output}
+            return {"answer": response}
         else:
             # For multiple answers, this would need to be implemented based on model's capability
             # Currently, just return the single answer but wrapped in a list
-            return [{"answer": decoded_output}]
+            return [{"answer": response}]
