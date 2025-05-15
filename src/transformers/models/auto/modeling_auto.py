@@ -1598,6 +1598,12 @@ MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES = OrderedDict(
     ]
 )
 
+MODEL_FOR_AUDIO_QUESTION_ANSWERING_MAPPING_NAMES = OrderedDict(
+    [
+        ("qwen2-audio", "Qwen2AudioForAudioQuestionAnswering"),
+    ]
+)
+
 MODEL_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, MODEL_MAPPING_NAMES)
 MODEL_FOR_PRETRAINING_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, MODEL_FOR_PRETRAINING_MAPPING_NAMES)
 MODEL_WITH_LM_HEAD_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, MODEL_WITH_LM_HEAD_MAPPING_NAMES)
@@ -1705,6 +1711,10 @@ MODEL_FOR_TIME_SERIES_PREDICTION_MAPPING = _LazyAutoMapping(
 )
 
 MODEL_FOR_IMAGE_TO_IMAGE_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, MODEL_FOR_IMAGE_TO_IMAGE_MAPPING_NAMES)
+
+MODEL_FOR_AUDIO_QUESTION_ANSWERING_MAPPING = _LazyAutoMapping(
+    CONFIG_MAPPING_NAMES, MODEL_FOR_AUDIO_QUESTION_ANSWERING_MAPPING_NAMES
+)
 
 
 class AutoModelForMaskGeneration(_BaseAutoModelClass):
@@ -2003,6 +2013,15 @@ class AutoModelForMaskedImageModeling(_BaseAutoModelClass):
 AutoModelForMaskedImageModeling = auto_class_update(AutoModelForMaskedImageModeling, head_doc="masked image modeling")
 
 
+class AutoModelForAudioQuestionAnswering(_BaseAutoModelClass):
+    _model_mapping = MODEL_FOR_AUDIO_QUESTION_ANSWERING_MAPPING
+
+
+AutoModelForAudioQuestionAnswering = auto_class_update(
+    AutoModelForAudioQuestionAnswering, head_doc="audio question answering"
+)
+
+
 class AutoModelWithLMHead(_AutoModelWithLMHead):
     @classmethod
     def from_config(cls, config):
@@ -2027,6 +2046,7 @@ class AutoModelWithLMHead(_AutoModelWithLMHead):
 
 __all__ = [
     "MODEL_FOR_AUDIO_CLASSIFICATION_MAPPING",
+    "MODEL_FOR_AUDIO_QUESTION_ANSWERING_MAPPING",
     "MODEL_FOR_AUDIO_FRAME_CLASSIFICATION_MAPPING",
     "MODEL_FOR_AUDIO_XVECTOR_MAPPING",
     "MODEL_FOR_BACKBONE_MAPPING",
@@ -2110,4 +2130,5 @@ __all__ = [
     "AutoModelForZeroShotImageClassification",
     "AutoModelForZeroShotObjectDetection",
     "AutoModelForImageTextToText",
+    "AutoModelForAudioQuestionAnswering",
 ]
